@@ -1,0 +1,17 @@
+
+Start the router:
+erl -sname erl_router
+
+Start the Web Server
+cd erl_http; ./start.sh
+
+Start the erl_bot:
+erl -sname erl_bot
+
+In the router
+ router> net_adm:ping('erl_http@host').
+ router> net_adm:ping('erl_bot@host').
+ router> router:start_link().
+
+In erl_bot star the bot:
+ erl_bot> erl_bot:start().
