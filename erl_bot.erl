@@ -78,14 +78,11 @@ loop(MySession) ->
     end.
 
 handle_group_message(Record) ->
-	io:format("~p~n", [Record#received_packet.from]),
 	% Extract the Room, Who said it (From) and the Message (Body) from the packet.
 	[Room, Rest] = string:tokens(Record#received_packet.from, "@"),
-	%[_, From] = string:tokens(Rest, "/"),
-	From = "Anon",
+	From = extract_from_name(string:tokens(Rest, "/")),
 	Body = exmpp_message:get_body(Record#received_packet.raw_packet),
-	
-	io:format("[~s/~s] ~s~n", [Room, From, Body]),
+	%io:format("[~s/~s] ~s~n", [Room, From, Body]),
 	router:send(Room, io_lib:format("[~s] ~s\n", [From, Body])).
 
 handle_message(Record) ->
@@ -100,3 +97,6 @@ join_room (Session, Room) ->
 	exmpp_session:send_packet(Session, #xmlel {name=presence, attrs=[#xmlattr{name=to,
 		value=list_to_binary(Room++"@"++?MUC_HOST++"/"++?USERNAME)}],
 		children=[#xmlel{name=x, attrs=[#xmlattr{name=xmlns, value=?MUC}]}]}).
+
+extract_from_name([_, From]) 	-> From;
+extract_from_name([_]) 		-> "Channel".
