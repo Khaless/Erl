@@ -79,10 +79,10 @@ loop(MySession) ->
 
 handle_group_message(Record) ->
 	% Extract the Room, Who said it (From) and the Message (Body) from the packet.
-	[Room, Rest] = string:tokens(Record#received_packet.from, "@"),
-	From = extract_from_name(string:tokens(Rest, "/")),
+	[Room, Rest] = extract_first_then_join(string:tokens(Record#received_packet.from, "@"), "@"),
+	[_, From] = extract_first_then_join(string:tokens(Rest, "/"), "/"),
 	Body = exmpp_message:get_body(Record#received_packet.raw_packet),
-	%io:format("[~s/~s] ~s~n", [Room, From, Body]),
+	io:format("[~s/~s] ~s~n", [Room, From, Body]),
 	router:send(Room, io_lib:format("[~s] ~s\n", [From, Body])).
 
 handle_message(Record) ->
@@ -98,5 +98,9 @@ join_room (Session, Room) ->
 		value=list_to_binary(Room++"@"++?MUC_HOST++"/"++?USERNAME)}],
 		children=[#xmlel{name=x, attrs=[#xmlattr{name=xmlns, value=?MUC}]}]}).
 
-extract_from_name([_, From]) 	-> From;
-extract_from_name([_]) 		-> "Channel".
+extract_first_then_join([H | T], Sym) ->
+	[H, ccstr(T, Sym)].
+
+ccstr([], Sym) 		-> "Channel";
+ccstr([H], Sym) 	-> H;
+ccstr([H | T], Sym) 	-> string:concat(H, string:concat(Sym, ccstr(T, Sym))).
