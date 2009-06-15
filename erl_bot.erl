@@ -55,7 +55,11 @@ session(MySession, _MyJID) ->
     exmpp_session:send_packet(MySession,
 			      exmpp_presence:set_status(
 				exmpp_presence:available(), "Erl is on-line and awaiting your command.")),
-    join_room(MySession, ?ROOM),
+
+    receive
+    after 1000 ->
+    	join_room(MySession, ?ROOM)
+    end,
     loop(MySession).
 
 %% Process exmpp packet:
@@ -79,8 +83,7 @@ loop(MySession) ->
 
 handle_group_message(Record) ->
 	% Extract the Room, Who said it (From) and the Message (Body) from the packet.
-	[Room, Rest] = extract_first_then_join(string:tokens(Record#received_packet.from, "@"), "@"),
-	[_, From] = extract_first_then_join(string:tokens(Rest, "/"), "/"),
+	[{from, From}, {server, _}, {room, Room}] = parse_from(Record#received_packet.from),
 	Body = exmpp_message:get_body(Record#received_packet.raw_packet),
 	io:format("[~s/~s] ~s~n", [Room, From, Body]),
 	router:send(Room, io_lib:format("[~s] ~s\n", [From, Body])).
@@ -98,9 +101,15 @@ join_room (Session, Room) ->
 		value=list_to_binary(Room++"@"++?MUC_HOST++"/"++?USERNAME)}],
 		children=[#xmlel{name=x, attrs=[#xmlattr{name=xmlns, value=?MUC}]}]}).
 
-extract_first_then_join([H | T], Sym) ->
-	[H, ccstr(T, Sym)].
+parse_from(String) ->
+	parse_from1(String, [], "").
 
-ccstr([], Sym) 		-> "Channel";
-ccstr([H], Sym) 	-> H;
-ccstr([H | T], Sym) 	-> string:concat(H, string:concat(Sym, ccstr(T, Sym))).
+parse_from1([H, $@ | T], Record, Acc) -> 
+	Record2 = [{room, lists:reverse([H | Acc])} | Record],
+	parse_from1(T, Record2, "");
+parse_from1([H, $/ | T], Record, Acc) ->
+	[{from, T}, {server, lists:reverse([H | Acc])} | Record];
+parse_from1([H], Record, Acc) ->
+	[{from, "Channel"}, {server, lists:reverse([H | Acc])} | Record];
+parse_from1([H|T], Record, Acc) ->
+	parse_from1(T, Record, [H | Acc]).
